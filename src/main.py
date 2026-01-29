@@ -6,7 +6,7 @@ import numpy as np
 import os
 import sys
 import argparse
-from typing import List
+from typing import List, Dict
 
 # Добавляем путь к модулям
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -68,21 +68,107 @@ def process_orthophoto(input_path: str,
     print(f"Загрузка ортофотоплана: {input_path}")
 
     # Устанавливаем лимиты для больших файлов
-    rasterio.env.Env(GDAL_MAX_DATASET_OPENED=1000, GDAL_DISABLE_READDIR_ON_OPEN='EMPTY_DIR')
-
-    # Используем многопоточную обработку для полного ортофотоплана
-    results = process_orthophoto_full(
-        input_path,
-        output_dir,
-        n_workers=n_workers,
-        min_area=min_area,
-        max_area=max_area,
-        local_directory=os.path.join(os.path.expanduser("~"), "dask_scratch")
+    rasterio.env.Env(
+        GDAL_MAX_DATASET_OPENED=1000,
+        GDAL_DISABLE_READDIR_ON_OPEN='EMPTY_DIR',
+        GDAL_MAX_OPENED_DATASET=1000,
+        GDAL_DISABLE_OPEN_OF_LARGE_FILE=0,
+        VSI_CACHE=1,
+        VSI_CACHE_SIZE=1073741824  # 1GB cache
     )
 
-    print(f"Обработка завершена. Найдено {results['total_objects']} объектов")
-    if not results['success']:
-        print(f"Ошибка: {results['error']}")
+    # Для больших файлов используем простую последовательную обработку
+    # вместо Dask для избежания проблем с памятью
+    try:
+        # Проверяем размер файла
+        try:
+            file_size = os.path.getsize(input_path)
+            print(f"Размер файла: {file_size / (1024**3):.2f} GB")
+        except Exception as e:
+            print(f"Не удалось получить размер файла: {e}")
+
+        # Используем простую последовательную обработку
+        results = process_orthophoto_simple(
+            input_path,
+            output_dir,
+            min_area=min_area,
+            max_area=max_area
+        )
+
+        print(f"Обработка завершена. Найдено {results['total_objects']} объектов")
+        if not results['success']:
+            print(f"Ошибка: {results['error']}")
+    except Exception as e:
+        print(f"Ошибка при обработке: {str(e)}")
+        import traceback
+        traceback.print_exc()
+
+
+def process_orthophoto_simple(orthophoto_path: str,
+                              output_dir: str,
+                              min_area: int = 100,
+                              max_area: int = 10000) -> Dict:
+    """
+    Простая последовательная обработка ортофотоплана без Dask
+
+    Args:
+        orthophoto_path (str): Путь к ортофотоплану
+        output_dir (str): Директория для вывода результатов
+        min_area (int): Минимальная площадь объекта
+        max_area (int): Максимальная площадь объекта
+
+    Returns:
+        Dict: Результаты обработки
+    """
+    try:
+        # Загружаем ортофотоплан
+        print("Загрузка ортофотоплана...")
+        orthophoto = load_orthophoto(orthophoto_path)
+        print(f"Ортофотоплан загружен. Размер: {orthophoto.shape}")
+
+        # Предварительная обработка
+        print("Предварительная обработка...")
+        processed_orthophoto = preprocess_orthophoto(orthophoto)
+        processed_orthophoto = apply_gaussian_filter(processed_orthophoto, sigma=1.0)
+        processed_orthophoto = normalize_rgb_channels(processed_orthophoto)
+
+        # Выделение зеленых насаждений
+        print("Выделение зеленых насаждений...")
+        vegetation_objects = extract_vegetation_objects(
+            processed_orthophoto,
+            min_area=min_area,
+            max_area=max_area
+        )
+
+        # Сохранение результатов
+        print("Сохранение результатов...")
+        os.makedirs(output_dir, exist_ok=True)
+
+        # Сохраняем результаты в файлы
+        results_summary = {
+            'total_objects': len(vegetation_objects),
+            'objects': vegetation_objects,
+            'success': True,
+            'error': None
+        }
+
+        # Просто сохраняем информацию о найденных объектах
+        summary_file = os.path.join(output_dir, "results_summary.json")
+        import json
+        with open(summary_file, 'w', encoding='utf-8') as f:
+            json.dump(results_summary, f, ensure_ascii=False, indent=2)
+
+        return results_summary
+
+    except Exception as e:
+        print(f"Ошибка при простой обработке: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return {
+            'total_objects': 0,
+            'success': False,
+            'error': str(e)
+        }
 
 def main():
     """

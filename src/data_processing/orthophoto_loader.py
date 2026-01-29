@@ -6,6 +6,7 @@ import numpy as np
 from PIL import Image
 import os
 from typing import Tuple, Optional
+import rasterio
 
 def load_orthophoto(file_path: str) -> np.ndarray:
     """
@@ -18,9 +19,46 @@ def load_orthophoto(file_path: str) -> np.ndarray:
         np.ndarray: Массив изображения в формате (height, width, channels)
     """
     try:
-        # Загружаем изображение с помощью PIL
-        img = Image.open(file_path)
-        img_array = np.array(img)
+        # Проверяем размер файла
+        file_size = os.path.getsize(file_path)
+        # Если файл очень большой, используем rasterio напрямую
+        if file_size > 1000000000:  # 1GB
+            # Используем rasterio для больших файлов
+            with rasterio.open(file_path) as src:
+                # Читаем все каналы
+                img_array = src.read()
+                # Переворачиваем ось для правильного формата (height, width, channels)
+                img_array = np.transpose(img_array, (1, 2, 0))
+        else:
+            # Для маленьких файлов используем PIL
+            # Обрабатываем возможные проблемы с кодировкой пути
+            try:
+                img = Image.open(file_path)
+                img_array = np.array(img)
+            except (UnicodeDecodeError, Exception) as e:
+                # Если есть проблемы с кодировкой, пробуем использовать pathlib
+                try:
+                    import pathlib
+                    path = pathlib.Path(file_path)
+                    if path.exists():
+                        img = Image.open(str(path))
+                        img_array = np.array(img)
+                    else:
+                        raise Exception(f"Файл не найден: {file_path}")
+                except Exception:
+                    # Если всё ещё не получилось, пробуем открыть как байтовый файл
+                    try:
+                        # Пробуем открыть файл в бинарном режиме и преобразовать
+                        with open(file_path, 'rb') as f:
+                            # Если это не изображение, возьмём просто байты
+                            pass
+                        # Если мы дошли до сюда, попробуем использовать rasterio напрямую
+                        import rasterio as rio
+                        with rio.open(file_path) as src:
+                            img_array = src.read()
+                            img_array = np.transpose(img_array, (1, 2, 0))
+                    except Exception:
+                        raise Exception(f"Не удалось загрузить файл: {file_path}")
 
         # Обработка альфа-канала (если присутствует)
         if len(img_array.shape) == 3 and img_array.shape[2] == 4:

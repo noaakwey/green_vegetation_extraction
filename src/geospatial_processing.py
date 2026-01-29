@@ -185,4 +185,25 @@ def get_orthophoto_info(orthophoto_path: str) -> Dict:
                 }
         except Exception:
             pass
-        raise Exception(f"Ошибка получения информации об ортофотоплане: {str(e)}")
+        # Если всё ещё не получилось, пробуем с увеличенными лимитами
+        try:
+            # Установим env переменные и открываем файл отдельно
+            # Используем глобальную переменную rasterio, чтобы избежать проблем с областями видимости
+            import rasterio as rio
+            rio.env.Env(
+                GDAL_MAX_OPENED_DATASET=1000,
+                GDAL_DISABLE_OPEN_OF_LARGE_FILE=0
+            )
+            with rio.open(orthophoto_path) as src:
+                info = {
+                    'width': src.width,
+                    'height': src.height,
+                    'count': src.count,
+                    'dtype': src.dtypes[0],
+                    'crs': str(src.crs),
+                    'transform': src.transform,
+                    'bounds': src.bounds
+                }
+                return info
+        except Exception as e2:
+            raise Exception(f"Ошибка получения информации об ортофотоплане: {str(e2)}")

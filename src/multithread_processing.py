@@ -75,6 +75,17 @@ def process_orthophoto_chunk(orthophoto_path: str,
         Dict: Результаты обработки
     """
     try:
+        # Устанавливаем лимиты для больших файлов в каждом потоке
+        import rasterio
+        rasterio.env.Env(
+            GDAL_MAX_DATASET_OPENED=1000,
+            GDAL_DISABLE_READDIR_ON_OPEN='EMPTY_DIR',
+            GDAL_MAX_OPENED_DATASET=1000,
+            GDAL_DISABLE_OPEN_OF_LARGE_FILE=0,
+            VSI_CACHE=1,
+            VSI_CACHE_SIZE=1073741824  # 1GB cache
+        )
+
         # Загрузка и предварительная обработка
         orthophoto = load_orthophoto(orthophoto_path)
         processed_orthophoto = preprocess_orthophoto(orthophoto)
