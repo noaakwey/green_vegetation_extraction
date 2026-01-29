@@ -77,8 +77,7 @@ def process_orthophoto(input_path: str,
         VSI_CACHE_SIZE=1073741824  # 1GB cache
     )
 
-    # Для больших файлов используем простую последовательную обработку
-    # вместо Dask для избежания проблем с памятью
+    # Для любых файлов используем многопоточную тайловую обработку
     try:
         # Проверяем размер файла
         try:
@@ -87,10 +86,11 @@ def process_orthophoto(input_path: str,
         except Exception as e:
             print(f"Не удалось получить размер файла: {e}")
 
-        # Используем простую последовательную обработку
-        results = process_orthophoto_simple(
+        # Используем многопоточную обработку
+        results = process_orthophoto_full(
             input_path,
             output_dir,
+            n_workers=n_workers,
             min_area=min_area,
             max_area=max_area
         )

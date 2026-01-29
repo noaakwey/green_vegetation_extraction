@@ -7,13 +7,15 @@ from PIL import Image
 import os
 from typing import Tuple, Optional
 import rasterio
+from rasterio.windows import Window
 
-def load_orthophoto(file_path: str) -> np.ndarray:
+def load_orthophoto(file_path: str, window: Optional[Window] = None) -> np.ndarray:
     """
     Загрузка ортофотоплана из файла
 
     Args:
         file_path (str): Путь к файлу ортофотоплана
+        window (Optional[Window]): Окно для чтения части изображения (для больших файлов)
 
     Returns:
         np.ndarray: Массив изображения в формате (height, width, channels)
@@ -21,14 +23,15 @@ def load_orthophoto(file_path: str) -> np.ndarray:
     try:
         # Проверяем размер файла
         file_size = os.path.getsize(file_path)
-        # Если файл очень большой, используем rasterio напрямую
-        if file_size > 1000000000:  # 1GB
-            # Используем rasterio для больших файлов
-            with rasterio.open(file_path) as src:
-                # Читаем все каналы
-                img_array = src.read()
-                # Переворачиваем ось для правильного формата (height, width, channels)
-                img_array = np.transpose(img_array, (1, 2, 0))
+        # Если указано окно или файл очень большой, используем rasterio напрямую
+        if window is not None or file_size > 1000000000:  # 1GB
+            # Используем rasterio для больших файлов с настройками энкодинга
+            with rasterio.Env(GDAL_FILENAME_IS_UTF8='YES', SHAPE_ENCODING='utf-8'):
+                with rasterio.open(file_path) as src:
+                    # Читаем каналы (с окном, если оно указано)
+                    img_array = src.read(window=window)
+                    # Переворачиваем ось для правильного формата (height, width, channels)
+                    img_array = np.transpose(img_array, (1, 2, 0))
         else:
             # Для маленьких файлов используем PIL
             # Обрабатываем возможные проблемы с кодировкой пути
@@ -54,9 +57,10 @@ def load_orthophoto(file_path: str) -> np.ndarray:
                             pass
                         # Если мы дошли до сюда, попробуем использовать rasterio напрямую
                         import rasterio as rio
-                        with rio.open(file_path) as src:
-                            img_array = src.read()
-                            img_array = np.transpose(img_array, (1, 2, 0))
+                        with rio.Env(GDAL_FILENAME_IS_UTF8='YES', SHAPE_ENCODING='utf-8'):
+                            with rio.open(file_path) as src:
+                                img_array = src.read()
+                                img_array = np.transpose(img_array, (1, 2, 0))
                     except Exception:
                         raise Exception(f"Не удалось загрузить файл: {file_path}")
 

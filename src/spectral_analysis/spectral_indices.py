@@ -18,7 +18,7 @@ def calculate_ndvi(red: np.ndarray, nir: np.ndarray) -> np.ndarray:
     """
     # Для RGB данных NDVI не может быть напрямую вычислен, но можно использовать упрощенные индексы
     # Используем упрощенный NDVI с RGB каналами
-    ndvi = (nir.astype(np.float32) - red.astype(np.float32)) / (nir.astype(np.float32) + red.astype(np.float32) + 0.001)
+    ndvi = (nir - red) / (nir + red + 0.001)
     return ndvi
 
 def calculate_green_ratio(red: np.ndarray, green: np.ndarray) -> np.ndarray:
@@ -32,7 +32,7 @@ def calculate_green_ratio(red: np.ndarray, green: np.ndarray) -> np.ndarray:
     Returns:
         np.ndarray: Соотношение G/R
     """
-    ratio = green.astype(np.float32) / (red.astype(np.float32) + 0.001)
+    ratio = green / (red + 0.001)
     return ratio
 
 def calculate_green_blue_ratio(green: np.ndarray, blue: np.ndarray) -> np.ndarray:
@@ -46,7 +46,7 @@ def calculate_green_blue_ratio(green: np.ndarray, blue: np.ndarray) -> np.ndarra
     Returns:
         np.ndarray: Соотношение G/B
     """
-    ratio = green.astype(np.float32) / (blue.astype(np.float32) + 0.001)
+    ratio = green / (blue + 0.001)
     return ratio
 
 def calculate_green_index(red: np.ndarray, green: np.ndarray) -> np.ndarray:
@@ -61,7 +61,7 @@ def calculate_green_index(red: np.ndarray, green: np.ndarray) -> np.ndarray:
         np.ndarray: Индекс зелености
     """
     # Упрощенный индекс зелености
-    index = (green.astype(np.float32) - red.astype(np.float32)) / (green.astype(np.float32) + red.astype(np.float32) + 0.001)
+    index = (green - red) / (green + red + 0.001)
     return index
 
 def calculate_color_indices(rgb_data: np.ndarray) -> Dict[str, np.ndarray]:
