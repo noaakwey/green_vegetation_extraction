@@ -59,9 +59,7 @@ def setup_dask_client(n_workers: int = None, threads_per_worker: int = 1, local_
         n_workers=n_workers,
         threads_per_worker=threads_per_worker,
         memory_limit='auto',
-        local_directory=local_directory,
-        # Оптимизация для Windows
-        process_limit=n_workers
+        local_directory=local_directory
     )
 
     print(f"Запущен Dask клиент с {n_workers} рабочими процессами")
